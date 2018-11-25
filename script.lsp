@@ -1,38 +1,58 @@
 ;; Exporteer polylijnen
 
-(Defun c:KTDKolommen (/ sset)
-  (initget "Yes No")
-  (if (eq (getkword "\nAlle bestaande 'PT' blocks zullen worden verwijderd. Wenst u door te gaan? [Yes/No] <No>: ") "Yes")
-     (progn
-       (setq sset (ssget "_X" (list '(0 . "INSERT") (cons 2 "PT"))))
-       (command "ERASE" sset "")
-       (c:plaatsblokken)
-     )
-  )
-)
+(Defun c:KTDKolommen (/ selectie blocks puntenlijst niv n ptn i)
 
-(Defun c:plaatsblokken (/ ent fh fn hnd itm num obj pnt sset v vexx xval sortonx yval sortony xmax xmin ymax ymin zval kword width height bottom top left right)
-  ;; helper to get 3dpoly coordinates
-  (Defun 3dpoly-verts (en / elist  lst vex)
-    ;; cdr: verkrijg het tweede element
-    ;; entget: geeft eigenschappen terug van de entiteit als dotted lists
-    ;; mapcar: voert de functie 'cdr' uit op elk element in de lijst
-    ;; member: geeft de lijst terug vanaf de positie waar het argument gevonden wordt
-    ;; -> wordt er niks gevonden, dan geeft member 'nil' terug
+  (Defun bouwpuntenlijst (selectie / sset itm num hnd ent obj punten lijst)
+    ;; Selecteer alle punten binnen de huidige selectie
+
+    (setq sset
+      (ssget "_P" '(
+                (-4 . "<AND")
+                  (0 . "*POLYLINE")
+                  (-4 . "&")(70 . 8)
+                (-4 . "AND>")
+              )
+      )
+    )
+
+    (if sset
+      (progn
+        ;; sslength: bewaar in 'num' het aantal 3D polylines dat we selecteerden
+        (setq itm 0 num (sslength sset))
+
+        (while (< itm num)
+          (setq hnd (ssname sset itm))
+          (setq ent (entget hnd))
+          (setq obj (cdr (assoc 0 ent)))
+          ;; cond: wordt hier als een soort switch gebruikt
+          (cond
+            ((eq obj "POLYLINE")
+      	      (setq punten (punten3dpoly hnd))
+              (setq lijst (append punten lijst))
+            )
+            (t nil)
+          )
+
+          (setq itm (1+ itm))
+        )
+      )
+    )
+
+    (reverse lijst)
+  )
+
+  ;;________________________________________________;;
+
+  (Defun punten3dpoly (en / elist  lst vex)
     (if (member "AcDb3dPolyline" (mapcar 'cdr (entget en)))
       (progn
-        ;; entnext: de volgende entiteit in de database kan bestaan uit subentiteiten
-        ;; TIP: extracting the -2 group from that entity, which is the main entity's name
         (setq vex (entnext en))
         (setq elist (entget vex))
         (while (= (cdr (assoc 0 elist)) "VERTEX")
-          ;; cons: voeg het 1ste argument vooraan aan de lijst toe die je als tweede element opgaf
-          ;; -> indien de argumenten twee atoms zijn, dan wordt een dotted list terug gegeven
-          ;; trans: zet het punt om van UCS naar WCS
           (setq lst (cons (trans (cdr (assoc 10 elist)) 1 0) lst))
-        	(setq vex (entnext vex))
-        	(setq elist (entget vex))
-  	    )
+          (setq vex (entnext vex))
+          (setq elist (entget vex))
+        )
       )
     )
     (reverse lst)
@@ -46,171 +66,202 @@
 
   ;;________________________________________________;;
 
-  ;;; Filter puntenlijst
   (Defun filter ( lst elem ineq param )
       (vl-remove-if-not '(lambda (x) (apply ineq (list (nth elem x) param))) lst)
   )
 
   ;;________________________________________________;;
 
-  ;; Selecteer alle punten en 3D polylijnen
-  (setq sset
-    (ssget "_X" '(
-              (-4 . "<AND")
-                (0 . "*POLYLINE")
-                (-4 . "&")(70 . 8)
-              (-4 . "AND>")
-            )
-    )
+  (Defun round ( n )
+    (fix (+ n (if (minusp n) -0.5 0.5)))
   )
 
-  ;; Voorkom een dialog wanneer je de 'PT' block wilt plaatsen
-  (setvar 'attdia 0)
+  ;;________________________________________________;;
 
-  (if sset
-    (progn
-      ;; sslength: bewaar in 'num' het aantal 3D polylines dat we selecteerden
-      (setq itm 0 num (sslength sset))
+  (Defun eenvleugjemaggie ( lst / zval sortonx sortony xmin xmax ymin ymax width height bottom top left right kword)
 
-      (while (< itm num)
-        (setq hnd (ssname sset itm))
-        (setq ent (entget hnd))
-        (setq obj (cdr (assoc 0 ent)))
-        (write-line "" fh)
-        ;; cond: wordt hier als een soort switch gebruikt
-        (cond
-          ((eq obj "POLYLINE")
-    	      (setq v hnd)
-    	      (setq vexx (3dpoly-verts v ))
+    (setq zval (mapcar 'caddr lst))
 
-            ;; plaats block op de figuur
+    (setq sortonx (vl-sort lst '(lambda (a b) (< (car a) (car b)))))
+    (setq sortony (vl-sort lst '(lambda (a b) (< (cadr a) (cadr b)))))
 
-            (setq xval (mapcar 'car vexx))
-            (setq yval (mapcar 'cadr vexx))
-            (setq zval (mapcar 'caddr vexx))
+    (setq xmin (car (car sortonx)) xmax (car (nth (1- (length sortonx)) sortonx)))
+    (setq ymin (cadr (car sortony)) ymax (cadr (nth (1- (length sortony)) sortony)))
 
-            (setq xmin (apply 'min xval) xmax (apply 'max xval))
-            (setq ymin (apply 'min yval) ymax (apply 'max yval))
+    (princ (strcat "xmin: " (rtos xmin 2 5) " xmax: " (rtos xmax 2 5)))
+    (princ (strcat "ymin: " (rtos xmin 2 5) " ymax: " (rtos xmax 2 5)))
 
-            (setq sortonx (vl-sort vexx '(lambda (a b) (< (car a) (car b)))))
-            (setq sortony (vl-sort vexx '(lambda (a b) (< (cadr a) (cadr b)))))
+    ;; Definieer de breedte en hoogte van de kolommen
+    (setq width (- xmax xmin))
+    (setq height (- ymax ymin))
 
-            ;; Definieer de breedte en hoogte van de kolommen
-            (setq width (- xmax xmin))
-            (setq height (- ymax ymin))
+    ;; Maak een selectie van de zijkanten
+    (setq bottom (filter (filter (filter sortonx 0 '> (+ xmin (/ width 8))) 1 '< (+ ymin (/ height 2))) 0 '< (- xmax (/ width 8))))
+    (setq top (filter (filter (filter sortonx 0 '> (+ xmin (/ width 8))) 1 '> (- ymax (/ height 2))) 0 '< (- xmax (/ width 8))))
+    (setq left (filter (filter (filter sortony 1 '> (+ ymin (/ height 8))) 0 '< (+ xmin (/ width 2))) 1 '< (- ymax (/ height 8))))
+    (setq right (filter (filter (filter sortony 1 '> (+ ymin (/ height 8))) 0 '> (- xmax (/ width 2))) 1 '< (- ymax (/ height 8))))
 
-            ;; Maak een selectie van de zijkanten
-            (setq bottom (filter (filter (filter sortonx 0 '> (+ xmin (/ width 10))) 1 '< (+ ymin (/ height 2))) 0 '< (- xmax (/ width 10))))
-            (setq top (filter (filter (filter sortonx 0 '> (+ xmin (/ width 10))) 1 '> (- ymax (/ height 2))) 0 '< (- xmax (/ width 10))))
-            (setq left (filter (filter (filter sortony 1 '> (+ ymin (/ height 10))) 0 '< (+ xmin (/ width 2))) 1 '< (- ymax (/ height 10))))
-            (setq right (filter (filter (filter sortony 1 '> (+ ymin (/ height 10))) 0 '> (- xmax (/ width 2))) 1 '< (- ymax (/ height 10))))
+    ;; Wanneer de zijkant leeg is, dan wordt er een block geplaatst op een halve hoogte of breedte van het minimum
 
-            ;; Wanneer de zijkant leeg is, dan wordt er een block geplaatst op een halve hoogte of breedte van het minimum
-
-            ;; BOTTOM - Plaatsen block aan de ZUID zijde
-            (if (> (length bottom) 1)
-              (progn
-                (setq kword
-                  (strcat
-                    (rtos (car (nth (fix (/ (length bottom) 2)) bottom)) 2 5) ","
-                    (rtos (cadr (nth (fix (/ (length bottom) 2)) bottom)) 2 5) ","
-                    (rtos (caddr (nth (fix (/ (length bottom) 2)) bottom)) 2 1)
-                  )
-                )
-                (command "-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
-              )
-              (progn
-                (setq kword
-                  (strcat
-                    (rtos (/ (+ xmax xmin) 2) 2 5) ","
-                    (rtos (- ymin (/ height 2)) 2 5) ","
-                    (rtos (average zval) 2 1)
-                  )
-                )
-                (command "-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
-              )
-            )
-
-            ;; TOP - Plaatsen block aan de NOORD zijde
-            (if (> (length top) 1)
-              (progn
-                (setq kword
-                  (strcat
-                    (rtos (car (nth (fix (/ (length top) 2)) top)) 2 5) ","
-                    (rtos (cadr (nth (fix (/ (length top) 2)) top)) 2 5) ","
-                    (rtos (caddr (nth (fix (/ (length top) 2)) top)) 2 1)
-                  )
-                )
-                (command "-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
-              )
-              (progn
-                (setq kword
-                  (strcat
-                    (rtos (/ (+ xmax xmin) 2) 2 5) ","
-                    (rtos (+ ymax (/ height 2)) 2 5) ","
-                    (rtos (average zval) 2 1)
-                  )
-                )
-                (command "-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
-              )
-            )
-
-            ;; LEFT - Plaatsen block aan de WEST zijde
-            (if (> (length left) 1)
-              (progn
-                (setq kword
-                  (strcat
-                    (rtos (car (nth (fix (/ (length left) 2)) left)) 2 5) ","
-                    (rtos (cadr (nth (fix (/ (length left) 2)) left)) 2 5) ","
-                    (rtos (caddr (nth (fix (/ (length left) 2)) left)) 2 1)
-                  )
-                )
-                (command "-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
-              )
-              (progn
-                (setq kword
-                  (strcat
-                    (rtos (- xmin (/ width 2)) 2 5) ","
-                    (rtos (/ (+ ymax ymin) 2) 2 5) ","
-                    (rtos (average zval) 2 1)
-                  )
-                )
-                (command "-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
-              )
-            )
-
-            ;; RIGHT - Plaatsen block aan de OOST zijde
-            (if (> (length right) 1)
-              (progn
-                (setq kword
-                  (strcat
-                    (rtos (car (nth (fix (/ (length right) 2)) right)) 2 5) ","
-                    (rtos (cadr (nth (fix (/ (length right) 2)) right)) 2 5) ","
-                    (rtos (caddr (nth (fix (/ (length right) 2)) right)) 2 1)
-                  )
-                )
-                (command "-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
-              )
-              (progn
-                (setq kword
-                  (strcat
-                    (rtos (+ xmax (/ width 2)) 2 5) ","
-                    (rtos (/ (+ ymax ymin) 2) 2 5) ","
-                    (rtos (average zval) 2 1)
-                  )
-                )
-                (command "-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
-              )
-            )
+    ;; BOTTOM - Plaatsen block aan de ZUID zijde
+    (if (> (length bottom) 1)
+      (progn
+        (setq kword
+          (strcat
+            (rtos (car (nth (fix (/ (length bottom) 2)) bottom)) 2 5) ","
+            (rtos (cadr (nth (fix (/ (length bottom) 2)) bottom)) 2 5) ","
+            (rtos (caddr (nth (fix (/ (length bottom) 2)) bottom)) 2 1)
           )
-          (t nil)
         )
+        (command "-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
+      )
+      (progn
+        (setq kword
+          (strcat
+            (rtos (/ (+ xmax xmin) 2) 2 5) ","
+            (rtos (- ymin (/ height 2)) 2 5) ","
+            (rtos (average zval) 2 1)
+          )
+        )
+        (command "-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
+      )
+    )
 
-        (setq itm (1+ itm))
+    ;; TOP - Plaatsen block aan de NOORD zijde
+    (if (> (length top) 1)
+      (progn
+        (setq kword
+          (strcat
+            (rtos (car (nth (fix (/ (length top) 2)) top)) 2 5) ","
+            (rtos (cadr (nth (fix (/ (length top) 2)) top)) 2 5) ","
+            (rtos (caddr (nth (fix (/ (length top) 2)) top)) 2 1)
+          )
+        )
+        (command "-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
+      )
+      (progn
+        (setq kword
+          (strcat
+            (rtos (/ (+ xmax xmin) 2) 2 5) ","
+            (rtos (+ ymax (/ height 2)) 2 5) ","
+            (rtos (average zval) 2 1)
+          )
+        )
+        (command "-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
+      )
+    )
+
+    ;; LEFT - Plaatsen block aan de WEST zijde
+    (if (> (length left) 1)
+      (progn
+        (setq kword
+          (strcat
+            (rtos (car (nth (fix (/ (length left) 2)) left)) 2 5) ","
+            (rtos (cadr (nth (fix (/ (length left) 2)) left)) 2 5) ","
+            (rtos (caddr (nth (fix (/ (length left) 2)) left)) 2 1)
+          )
+        )
+        (command "-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
+      )
+      (progn
+        (setq kword
+          (strcat
+            (rtos (- xmin (/ width 2)) 2 5) ","
+            (rtos (/ (+ ymax ymin) 2) 2 5) ","
+            (rtos (average zval) 2 1)
+          )
+        )
+        (command "-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
+      )
+    )
+
+    ;; RIGHT - Plaatsen block aan de OOST zijde
+    (if (> (length right) 1)
+      (progn
+        (setq kword
+          (strcat
+            (rtos (car (nth (fix (/ (length right) 2)) right)) 2 5) ","
+            (rtos (cadr (nth (fix (/ (length right) 2)) right)) 2 5) ","
+            (rtos (caddr (nth (fix (/ (length right) 2)) right)) 2 1)
+          )
+        )
+        (command "-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
+      )
+      (progn
+        (setq kword
+          (strcat
+            (rtos (+ xmax (/ width 2)) 2 5) ","
+            (rtos (/ (+ ymax ymin) 2) 2 5) ","
+            (rtos (average zval) 2 1)
+          )
+        )
+        (command "-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
       )
     )
   )
 
-  (setvar 'attdia 1)
-  (princ)
+  ;;________________________________________________;;
+
+  (Defun hocuspocus ( lst / sortonx sortony xmin xmax ymin ymax kword)
+
+    (setq sortonx (vl-sort lst '(lambda (a b) (< (car a) (car b)))))
+    (setq sortony (vl-sort lst '(lambda (a b) (< (cadr a) (cadr b)))))
+
+    (setq xmin (car (car sortonx)) xmax (car (nth (1- (length sortonx)) sortonx)))
+    (setq ymin (cadr (car sortony)) ymax (cadr (nth (1- (length sortony)) sortony)))
+
+    (princ (strcat "xmin: " (rtos xmin 2 5) " xmax: " (rtos xmax 2 5)))
+    (princ (strcat "ymin: " (rtos xmin 2 5) " ymax: " (rtos xmax 2 5)))
+
+    (setq kword
+      (strcat
+        (rtos (/ (+ xmin xmax) 2) 2 5) ","
+        (rtos (/ (+ ymin ymax) 2) 2 5) ",0"
+      )
+    )
+    (command "-INSERT" "PT" kword "0.5" "0.5" "" "B" 2 0)
+  )
+
+  ;;________________________________________________;;
+
+  (princ "Selecteer de kolom")
+  (setq selectie (ssget))
+  (if selectie
+    (progn
+      (initget "Yes No")
+      (if (eq (getkword "\nAlle bestaande 'PT' blocks zullen worden verwijderd. Wenst u door te gaan? [Yes/No] <No>: ") "Yes")
+        (progn
+          (setq puntenlijst (bouwpuntenlijst selectie))
+
+          ;; Verwijder bestaande blocks
+          (setq blocks (ssget "_P" (list '(0 . "INSERT") (cons 2 "PT"))))
+          (command "ERASE" blocks "")
+
+          ;; Deel de polylijnen op in groepen
+          (setq niv (vl-sort (mapcar 'round (mapcar 'caddr puntenlijst)) '<))
+
+          (setvar 'attdia 0)
+          ;(setvar "CMDECHO" 0)
+
+          (setq i 0)
+
+          (foreach n niv
+            (setq ptn puntenlijst)
+            (setq ptn (filter ptn 2 '>= (- n 0.5)))
+            (setq ptn (filter ptn 2 '< (+ n 0.5)))
+
+            (eenvleugjemaggie ptn)
+
+            (if (= i 1) (hocuspocus ptn))
+
+            (setq i (1+ i))
+          )
+
+          ;(setvar "CMDECHO" 1)
+          (setvar 'attdia 1)
+
+        )
+      )
+    )
+  )
 )
