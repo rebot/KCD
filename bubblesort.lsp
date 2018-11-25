@@ -41,18 +41,3 @@
 )
 
 ;;________________________________________________;;
-
-(Defun filter ( lst elem ineq param )
-  (cond
-      ((= ineq -1) (vl-remove-if-not '(lambda (x) (< (nth elem x) param)) lst))
-      ((= ineq 0) (vl-remove-if-not '(lambda (x) (= (nth elem x) param)) lst))
-      ((= ineq 1) (vl-remove-if-not '(lambda (x) (> (nth elem x) param)) lst))
-      (t nil)
-  )
-)
-
-;;________________________________________________;;
-
-(Defun filterp ( lst elem ineq param )
-    (vl-remove-if-not '(lambda (x) (apply ineq (list (nth elem x) param))) lst)
-)
