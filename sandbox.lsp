@@ -30,8 +30,8 @@
   ;;________________________________________________;;
 
 
-  (setq sset "_X"
-    (ssget '(
+  (setq sset
+    (ssget "_X" '(
               (-4 . "<OR")
                 (0 . "POINT")
                 (-4 . "<AND")
@@ -57,24 +57,25 @@
             (setq hnd (ssname sset itm))
             (setq ent (entget hnd))
             (setq obj (cdr (assoc 0 ent)))
+            (write-line "" fh)
             ;; cond: wordt hier als een soort switch gebruikt
             (cond
               ((eq obj "POINT")
                 (setq pnt (cdr (assoc 10 ent)))
                 (setq pnt (trans pnt 0 1))
                 ;; rtos: 2de argument = de mode (2 = decimaal) - 3de argument = precisie
-                (write-line (strcat (rtos (car pnt) 2 3) ","
-                               (rtos (cadr pnt) 2 3) ","
-                               (rtos (caddr pnt) 2 3)) fh)
+                (write-line (strcat (rtos (car pnt) 2 4) ","
+                               (rtos (cadr pnt) 2 4) ","
+                               (rtos (caddr pnt) 2 4)) fh)
 
               )
               ((eq obj "POLYLINE")
         	      (setq v hnd)
         	      (setq vexx (3dpoly-verts v ))
         	      (foreach pnt vexx
-        		         (write-line (strcat (rtos (car pnt) 2 3) ","
-                        (rtos (cadr pnt) 2 3) ","
-                        (rtos (cadr pnt) 2 3)) fh)
+        		         (write-line (strcat (rtos (car pnt) 2 4) ","
+                        (rtos (cadr pnt) 2 4) ","
+                        (rtos (caddr pnt) 2 4)) fh)
                 )
               )
               (t nil)
@@ -84,6 +85,7 @@
           (close fh)
         )
       )
+      (sssetfirst nil sset)
     )
   )
   (princ)
