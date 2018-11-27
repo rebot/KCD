@@ -1,6 +1,6 @@
 ;; Exporteer polylijnen
 
-(Defun c:KTDKolommen (/ selectie puntenlijst niv n ptn i)
+(Defun c:KTDKolommen (/ selectie puntenlijst niv n ptn)
 
   (Defun bouwpuntenlijst (selectie / itm num hnd ent punten lijst)
     ;; Selecteer alle punten binnen de huidige selectie
@@ -61,8 +61,20 @@
 
   ;;________________________________________________;;
 
+  (defun unique ( l )
+    (if l (cons (car l) (unique (vl-remove (car l) (cdr l)))))
+  )
+
+  ;;________________________________________________;;
+
   (Defun round ( n )
     (fix (+ n (if (minusp n) -0.5 0.5)))
+  )
+
+  ;;________________________________________________;;
+
+  (defun roundm ( n m )
+    (* m (fix ((if (minusp n) - +) (/ n (float m)) 0.5)))
   )
 
   ;;________________________________________________;;
@@ -88,15 +100,23 @@
 
   ;;________________________________________________;;
 
-  (Defun eenvleugjemaggie ( lst / zval sortonx sortony xmin xmax ymin ymax width height bottom top left right kword)
+  (Defun eenvleugjemaggie ( lst / subniv subn lng zval sortonx sortony xmin xmax ymin ymax width height bottom top left right kword)
+
+    ;;__________ DEZE CODE IS OPTIONEEL - KIEST HET BELANGRIJKSTE SUBVLAK ______________;;
+    (setq subniv (unique (mapcar '(lambda (x) (roundm x 0.1)) (mapcar 'caddr lst))))
+
+    (foreach subn subniv
+      (setq lng (cons (filter (filter lst 2 '>= (- subn 0.05)) 2 '< (+ subn 0.05)) lng))
+    )
+
+    (setq lng (vl-sort lng '(lambda (a b) (> (length a) (length b)))))
+    (setq lst (nth 0 lng))
+    ;;__________ DEZE CODE IS OPTIONEEL - KIEST HET BELANGRIJKSTE SUBVLAK ______________;;
 
     (setq zval (mapcar 'caddr lst))
 
     (setq sortonx (vl-sort lst '(lambda (a b) (< (car a) (car b)))))
     (setq sortony (vl-sort lst '(lambda (a b) (< (cadr a) (cadr b)))))
-
-    ;(setq xmin (car (car sortonx)) xmax (car (nth (1- (length sortonx)) sortonx)))
-    ;(setq ymin (cadr (car sortony)) ymax (cadr (nth (1- (length sortony)) sortony)))
 
     (setq xmin (apply 'min (mapcar 'car lst)))
     (setq xmax (apply 'max (mapcar 'car lst)))
@@ -245,7 +265,6 @@
       (if (eq (getkword "\nAlle bestaande 'PT' blocks zullen worden verwijderd. Wenst u door te gaan? [Yes/No] <No>: ") "Yes")
         (progn
           ;; Verwijder bestaande blocks
-          (princ "verwijderblocks")
           (verwijderblocks selectie)
 
           ;; Bouw puntenlijst
@@ -256,16 +275,12 @@
 
           (setvar 'attdia 0)
 
-          (setq i 0)
-
           (foreach n niv
             (setq ptn puntenlijst)
             (setq ptn (filter ptn 2 '>= (- n 0.5)))
             (setq ptn (filter ptn 2 '< (+ n 0.5)))
 
             (eenvleugjemaggie ptn)
-
-            (setq i (1+ i))
           )
 
           (setvar 'attdia 1)
