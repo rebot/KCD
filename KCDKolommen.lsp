@@ -1,8 +1,8 @@
 ;; Exporteer polylijnen
 
-(Defun c:KTDKolommen (/ selectie puntenlijst niv n ptn)
+(Defun c:KCDKolommen (/ selectie puntenlijst niv n ptn)
 
-  (Defun bouwpuntenlijst (selectie / itm num hnd ent punten lijst)
+  (Defun bouwpuntenlijst (selectie / itm num hnd ent punten lijst zcoord lyr)
     ;; Selecteer alle punten binnen de huidige selectie
 
     (if selectie
@@ -18,6 +18,12 @@
             ((member "AcDb3dPolyline" (mapcar 'cdr ent))
       	      (setq punten (punten3dpoly hnd))
               (setq lijst (append punten lijst))
+
+              (setq zcoord (unique (mapcar '(lambda (x) (roundm x 0.1)) (mapcar 'caddr punten))))
+              (setq lyr (strcat "kolommen " (rtos (car zcoord) 2 2)))
+              (command "._layer" "_M" lyr "")
+
+              (entmod (subst (cons 8 lyr) (assoc 8 ent) ent))
             )
             (t nil)
           )
@@ -96,11 +102,13 @@
         )
       )
     )
+
+    (princ)
   )
 
   ;;________________________________________________;;
 
-  (Defun eenvleugjemaggie ( lst / subniv subn lng zval sortonx sortony xmin xmax ymin ymax width height bottom top left right kword)
+  (Defun eenvleugjemaggie ( lst / subniv subn lng zval sortonx sortony xmin xmax ymin ymax width height bottom top left right kword zcoord lyr)
 
     ;;__________ DEZE CODE IS OPTIONEEL - KIEST HET BELANGRIJKSTE SUBVLAK ______________;;
     (setq subniv (unique (mapcar '(lambda (x) (roundm x 0.1)) (mapcar 'caddr lst))))
@@ -138,7 +146,10 @@
     (setq left (filter (filter (filter sortony 1 '> (+ ymin (/ height 8))) 0 '< (+ xmin (/ width 2))) 1 '< (- ymax (/ height 8))))
     (setq right (filter (filter (filter sortony 1 '> (+ ymin (/ height 8))) 0 '> (- xmax (/ width 2))) 1 '< (- ymax (/ height 8))))
 
-    ;; Wanneer de zijkant leeg is, dan wordt er een block geplaatst op een halve hoogte of breedte van het minimum
+    ;; Zet de correcte layer aan
+    (setq zcoord (unique (mapcar '(lambda (x) (roundm x 0.1)) zval)))
+    (setq lyr (strcat "kolommen " (rtos (car zcoord) 2 2)))
+    (command "._layer" "_M" lyr "")
 
     ;; BOTTOM - Plaatsen block aan de ZUID zijde
     (if (> (length bottom) 2)
@@ -150,7 +161,7 @@
             (rtos (caddr (nth (fix (/ (length bottom) 2)) bottom)) 2 1)
           )
         )
-        (command "-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
+        (command "_.-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
       )
       (progn
         (setq kword
@@ -160,7 +171,7 @@
             (rtos (average zval) 2 1)
           )
         )
-        (command "-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
+        (command "_.-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
       )
     )
 
@@ -174,7 +185,7 @@
             (rtos (caddr (nth (fix (/ (length top) 2)) top)) 2 1)
           )
         )
-        (command "-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
+        (command "_.-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
       )
       (progn
         (setq kword
@@ -184,7 +195,7 @@
             (rtos (average zval) 2 1)
           )
         )
-        (command "-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
+        (command "_.-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
       )
     )
 
@@ -198,7 +209,7 @@
             (rtos (caddr (nth (fix (/ (length left) 2)) left)) 2 1)
           )
         )
-        (command "-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
+        (command "_.-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
       )
       (progn
         (setq kword
@@ -208,7 +219,7 @@
             (rtos (average zval) 2 1)
           )
         )
-        (command "-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
+        (command "_.-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
       )
     )
 
@@ -222,7 +233,7 @@
             (rtos (caddr (nth (fix (/ (length right) 2)) right)) 2 1)
           )
         )
-        (command "-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
+        (command "_.-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
       )
       (progn
         (setq kword
@@ -232,7 +243,7 @@
             (rtos (average zval) 2 1)
           )
         )
-        (command "-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
+        (command "_.-INSERT" "PT" kword "0.5" "0.5" "" (rtos (average zval) 2 0))
       )
     )
 
@@ -241,6 +252,7 @@
     (setq width nil height nil)
     (setq bottom nil top nil left nil right nil)
     (setq kword nil)
+    (princ)
   )
 
   ;;________________________________________________;;
@@ -274,6 +286,7 @@
           (setq niv (vl-sort (mapcar 'round (mapcar 'caddr puntenlijst)) '<))
 
           (setvar 'attdia 0)
+          (setvar 'attreq 1)
 
           (foreach n niv
             (setq ptn puntenlijst)
@@ -289,4 +302,6 @@
       )
     )
   )
+
+  (princ)
 )
