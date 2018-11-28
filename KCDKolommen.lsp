@@ -108,7 +108,7 @@
 
   ;;________________________________________________;;
 
-  (Defun eenvleugjemaggie ( lst / subniv subn lng zval sortonx sortony xmin xmax ymin ymax width height bottom top left right kword zcoord lyr)
+  (Defun eenvleugjemaggie ( lst / subniv subn lng lsti zval sortonx sortony xmin xmax ymin ymax width height bottom top left right kword zcoord lyr)
 
     ;;__________ DEZE CODE IS OPTIONEEL - KIEST HET BELANGRIJKSTE SUBVLAK ______________;;
     (setq subniv (unique (mapcar '(lambda (x) (roundm x 0.1)) (mapcar 'caddr lst))))
@@ -118,18 +118,18 @@
     )
 
     (setq lng (vl-sort lng '(lambda (a b) (> (length a) (length b)))))
-    (setq lst (nth 0 lng))
+    (setq lsti (nth 0 lng))
     ;;__________ DEZE CODE IS OPTIONEEL - KIEST HET BELANGRIJKSTE SUBVLAK ______________;;
 
-    (setq zval (mapcar 'caddr lst))
+    (setq zval (mapcar 'caddr lsti))
 
-    (setq sortonx (vl-sort lst '(lambda (a b) (< (car a) (car b)))))
-    (setq sortony (vl-sort lst '(lambda (a b) (< (cadr a) (cadr b)))))
+    (setq sortonx (vl-sort lsti '(lambda (a b) (< (car a) (car b)))))
+    (setq sortony (vl-sort lsti '(lambda (a b) (< (cadr a) (cadr b)))))
 
-    (setq xmin (apply 'min (mapcar 'car lst)))
-    (setq xmax (apply 'max (mapcar 'car lst)))
-    (setq ymin (apply 'min (mapcar 'cadr lst)))
-    (setq ymax (apply 'max (mapcar 'cadr lst)))
+    (setq xmin (apply 'min (mapcar 'car lsti)))
+    (setq xmax (apply 'max (mapcar 'car lsti)))
+    (setq ymin (apply 'min (mapcar 'cadr lsti)))
+    (setq ymax (apply 'max (mapcar 'cadr lsti)))
 
     (princ (strcat "\nxmin: " (rtos xmin 2 5) " xmax: " (rtos xmax 2 5)))
     (princ (strcat "\nymin: " (rtos xmin 2 5) " ymax: " (rtos xmax 2 5)))
